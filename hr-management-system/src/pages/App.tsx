@@ -9,6 +9,7 @@ import Departments from "./Departments";
 import CreateLogin from "./CreateLogin";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import ProtectedRoute from "../components/layout/ProtectedRoute";
+import Attendance from "./Attendance";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ export default function App() {
                         <Route element={<ProtectedRoute><DashboardLayout><Outlet /></DashboardLayout></ProtectedRoute>}>
                             <Route path="/employees" element={<Employees />} />
                             <Route path="/departments" element={<Departments />} />
+                            <Route path="/attendance" element={<Attendance />} />
 
                             {/* Only Admin/HR can see the CreateLogin route */}
                             <Route path="/create-login" element={

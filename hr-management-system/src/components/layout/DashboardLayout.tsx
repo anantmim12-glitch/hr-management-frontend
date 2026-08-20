@@ -2,14 +2,24 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/ui/button";
 import { Users, Building2, LogOut, ShieldCheck, CalendarCheck, LayoutDashboard } from "lucide-react";
+import { useLogout } from "../../hooks/useApi";
+
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { role, logout } = useAuth();
     const navigate = useNavigate();
+    const mutation = useLogout();
 
     const handleLogout = () => {
-        logout();
-        navigate("/login");
+        mutation.mutate(undefined, {
+            onSuccess: () => {
+                logout();
+                navigate("/login");
+            },
+            onError: (error) => {
+                console.log(error);
+            }
+        });
     };
 
     // Update the navItems array inside DashboardLayout.tsx

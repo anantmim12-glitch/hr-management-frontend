@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useGetAttendance, useMarkAttendance, useGetEmployees } from "../hooks/useApi";
+import { useGetAttendance, useMarkAttendance, useGetEmployees, useMarkSignout } from "../hooks/useApi";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -13,6 +13,8 @@ import { toast } from "react-toastify";
 export default function Attendance() {
     const { role } = useAuth();
     const canModify = role === "admin" || role === "hr";
+
+    const currentUser = JSON.parse(localStorage.getItem("currentUser"));
 
     // Filter states
     const today = new Date().toISOString().split('T')[0];
@@ -31,6 +33,7 @@ export default function Attendance() {
     });
 
     const markMut = useMarkAttendance();
+    const signoutMut = useMarkSignout();
 
     // Calculate Summary Stats
     const summary = useMemo(() => {
@@ -46,12 +49,77 @@ export default function Attendance() {
         }, { present: 0, absent: 0, halfDays: 0, total: 0 });
     }, [attendanceRecords]);
 
+    const greeting = useMemo(() => {
+        const hour = new Date().getHours();
+        if (hour < 12) return "Good morning";
+        if (hour < 17) return "Good afternoon";
+        return "Good evening";
+    }, []);
+
     const handleMarkAttendance = () => {
         markMut.mutate(undefined, {
-            onSuccess: () => toast.success("Attendance marked successfully for all employees!"),
+            onSuccess: () => toast.success("Attendance marked successfully!"),
             onError: () => toast.error("Failed to mark attendance."),
         });
     };
+
+    const handleMarkSignout = () => {
+        signoutMut.mutate(undefined, {
+            onSuccess: () => toast.success("Signout marked successfully!"),
+            onError: () => toast.error("Failed to mark signout."),
+        });
+    };
+
+    const formatTime = (timeStr: string | null | undefined) => {
+        if (!timeStr) return "—";
+
+        if (typeof timeStr === "string" && (timeStr.includes("T") || timeStr.includes("Z"))) {
+            const date = new Date(timeStr);
+            if (!isNaN(date.getTime())) {
+                return date.toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    timeZone: "UTC",
+                    hour12: true,
+                });
+            }
+        }
+
+        if (typeof timeStr === "string" && timeStr.includes(":")) {
+            const parts = timeStr.split(":");
+            const hours = parseInt(parts[0], 10);
+            const minutes = parseInt(parts[1], 10);
+            if (!isNaN(hours) && !isNaN(minutes)) {
+                const d = new Date(Date.UTC(2000, 0, 1, hours, minutes));
+                return d.toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    timeZone: "UTC",
+                    hour12: true,
+                });
+            }
+        }
+
+        return timeStr;
+    };
+
+    const currentDayRecord = useMemo(() => {
+        if (!attendanceRecords || !Array.isArray(attendanceRecords)) return null;
+
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
+
+        return attendanceRecords.find((record: any) => {
+            if (!record.AttendanceDate) return false;
+            const recDateStr = typeof record.AttendanceDate === 'string'
+                ? record.AttendanceDate.split('T')[0]
+                : new Date(record.AttendanceDate).toISOString().split('T')[0];
+            return recDateStr === todayStr;
+        });
+    }, [attendanceRecords]);
 
     return (
         <div className="space-y-8">
@@ -59,19 +127,29 @@ export default function Attendance() {
             <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-                        Good morning! <span className="text-blue-600">Anant</span> 👋
+                        {greeting}! <span className="text-blue-600">{currentUser?.FirstName} {currentUser?.LastName ? currentUser?.LastName : ""}</span> 👋
                     </h1>
                     <p className="text-slate-500 mt-1">Here is your attendance overview for today.</p>
                 </div>
                 {canModify && (
-                    <Button
-                        onClick={handleMarkAttendance}
-                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all"
-                        disabled={markMut.isPending}
-                    >
-                        <Fingerprint className="mr-2 h-4 w-4" />
-                        {markMut.isPending ? "Marking..." : "Mark All Attendance"}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {!currentDayRecord?.CheckIn && <Button
+                            onClick={handleMarkAttendance}
+                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all"
+                            disabled={markMut.isPending}
+                        >
+                            <Fingerprint className="mr-2 h-4 w-4" />
+                            {markMut.isPending ? "Marking..." : "Mark Attendance"}
+                        </Button>}
+                        {!currentDayRecord?.CheckOut && (<Button
+                            onClick={handleMarkSignout}
+                            className="bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 shadow-md hover:shadow-lg transition-all"
+                            disabled={markMut.isPending}
+                        >
+                            <Fingerprint className="mr-2 h-4 w-4" />
+                            {markMut.isPending ? "Marking..." : "Mark Signout"}
+                        </Button>)}
+                    </div>
                 )}
             </div>
 
@@ -185,20 +263,24 @@ export default function Attendance() {
                             attendanceRecords?.map((record: any, index: number) => (
                                 <TableRow key={index} className="border-b border-slate-100 transition-colors hover:bg-blue-50/40">
                                     <TableCell className="font-medium text-slate-800">
-                                        {new Date(record.Date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                        {new Date(record.AttendanceDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
                                     </TableCell>
-                                    <TableCell className="text-slate-600 flex items-center gap-2">
-                                        <Clock className="h-3.5 w-3.5 text-emerald-500" /> {record.CheckIn || "—"}
+                                    <TableCell className="text-slate-600">
+                                        <div className="flex items-center gap-2">
+                                            <Clock className="h-3.5 w-3.5 text-emerald-500" /> {formatTime(record.CheckIn)}
+                                        </div>
                                     </TableCell>
-                                    <TableCell className="text-slate-600 flex items-center gap-2">
-                                        <Clock className="h-3.5 w-3.5 text-red-500" /> {record.CheckOut || "—"}
+                                    <TableCell className="text-slate-600">
+                                        <div className="flex items-center gap-2">
+                                            <Clock className="h-3.5 w-3.5 text-red-500" /> {formatTime(record.CheckOut)}
+                                        </div>
                                     </TableCell>
-                                    <TableCell className="text-slate-700 font-medium">{record.WorkHours || "0h 0m"}</TableCell>
+                                    <TableCell className="text-slate-700 font-medium">{record.WorkingHours || "0.0"} Hrs</TableCell>
                                     <TableCell>
                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${record.Status?.toLowerCase().includes('present') ? 'bg-emerald-50 text-emerald-700' :
-                                                record.Status?.toLowerCase().includes('absent') ? 'bg-red-50 text-red-700' :
-                                                    record.Status?.toLowerCase().includes('half') ? 'bg-amber-50 text-amber-700' :
-                                                        'bg-slate-100 text-slate-600'
+                                            record.Status?.toLowerCase().includes('absent') ? 'bg-red-50 text-red-700' :
+                                                record.Status?.toLowerCase().includes('half') ? 'bg-amber-50 text-amber-700' :
+                                                    'bg-slate-100 text-slate-600'
                                             }`}>
                                             {record.Status}
                                         </span>

@@ -55,6 +55,10 @@ export const useLogin = () => useMutation({
     mutationFn: async (data) => (await api.post(`${baseURL}/api/auth/login`, data)).data,
 });
 
+export const useLogout = () => useMutation({
+    mutationFn: async () => (await api.post(`${baseURL}/api/auth/logout`)).data,
+});
+
 export const useCreateLogin = () => useMutation({
     mutationFn: async (data) => (await api.post(`${baseURL}/api/user/createLogin`, data)).data,
 });
@@ -64,6 +68,18 @@ export const useMarkAttendance = () => {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: async () => (await api.post("/api/attendance/markAttendance", {})).data,
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ["attendance"] });
+            // Also invalidate employees if the mark attendance endpoint modifies employee data
+            qc.invalidateQueries({ queryKey: ["employees"] });
+        },
+    });
+};
+
+export const useMarkSignout = () => {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: async () => (await api.post("/api/attendance/markSignout", {})).data,
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ["attendance"] });
             // Also invalidate employees if the mark attendance endpoint modifies employee data

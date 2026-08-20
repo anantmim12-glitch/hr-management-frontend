@@ -17,7 +17,7 @@ export default function Login() {
     const onSubmit = (data: any) => {
         mutation.mutate(data, {
             onSuccess: (res) => {
-                login(res.role);
+                login({ role: res.role, email: data.Email });
                 navigate("/employees");
             },
             onError: () => toast.error("Login failed. Check credentials."),

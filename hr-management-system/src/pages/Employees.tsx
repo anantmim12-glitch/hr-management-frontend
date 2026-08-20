@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useGetEmployees, useCreateEmployee, useUpdateEmployee, useDeleteEmployee, useGetDepartments } from "../hooks/useApi";
 import { useAuth } from "../context/AuthContext"; // ✅ Import useAuth
@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../components/ui/select";
 import { Pencil, Trash2, Plus, Mail, Phone, Search, Building2 } from "lucide-react";
 import { toast } from "react-toastify";
+
 
 export default function Employees() {
     const { data, isLoading } = useGetEmployees();
@@ -26,6 +27,18 @@ export default function Employees() {
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<any | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const [currentEmployee, setCurrentEmployee] = useState({});
+
+    useEffect(() => {
+        const userDetails = localStorage.getItem("userDetails");
+        const user = JSON.parse(userDetails);
+        const employeeEmail = user.email;
+        const currentUser = data?.find((emp: any) => emp.Email === employeeEmail);
+        if (currentUser) {
+            setCurrentEmployee(currentUser);
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        }
+    }, [data]);
 
     const { register, handleSubmit, reset, control } = useForm<any>();
 

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState } from "react";
 
 interface AuthContextType {
     role: string | null;
-    login: (role: string) => void;
+    login: ({ role, email }: { role: string, email: string }) => void;
     logout: () => void;
 }
 
@@ -10,24 +10,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     // ✅ LAZY INITIAL STATE: Reads localStorage BEFORE the first render.
-    // This prevents the app from seeing 'null' on refresh.
     const [role, setRole] = useState<string | null>(() => {
         try {
-            const storedRole = localStorage.getItem("role");
-            return storedRole ? storedRole.toLowerCase() : null;
+            const userDetails = localStorage.getItem("userDetails");
+            return userDetails ? JSON.parse(userDetails).role : null;
         } catch {
             return null;
         }
     });
 
-    const login = (newRole: string) => {
+    const login = ({ role: newRole, email }: { role: string, email: string }) => {
         const formattedRole = newRole.toLowerCase();
-        localStorage.setItem("role", formattedRole);
+        localStorage.setItem("userDetails", JSON.stringify({ role: formattedRole, email }));
         setRole(formattedRole);
     };
 
     const logout = () => {
-        localStorage.removeItem("role");
+        localStorage.removeItem("userDetails");
+        localStorage.removeItem("currentUser");
         setRole(null);
         // Optional: call your backend logout API to clear the HttpOnly cookie
     };
